@@ -148,15 +148,22 @@ def fec_url(name):
     return "https://www.fec.gov/data/receipts/individual-contributions/?" + urllib.parse.urlencode({"contributor_employer": short_name(name)})
 
 
+def cell(v):
+    # Stop spreadsheet apps from treating a government text field as a formula
+    if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + v
+    return v
+
+
 def write_csv(leads):
     with open("leads.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["company", "amount", "date", "awarding office", "description", "not competed",
                     "same name had contracts before", "usaspending link", "fec employer search"])
         for r in leads:
-            w.writerow([r["Recipient Name"], r["Award Amount"], r["Base Obligation Date"], r["Awarding Sub Agency"],
+            w.writerow([cell(x) for x in [r["Recipient Name"], r["Award Amount"], r["Base Obligation Date"], r["Awarding Sub Agency"],
                         r["Description"], "yes" if r["not_competed"] else "", "yes" if r["same_name"] else "",
-                        award_url(r), fec_url(r["Recipient Name"])])
+                        award_url(r), fec_url(r["Recipient Name"])]])
 
 
 def fmt_date(s):
