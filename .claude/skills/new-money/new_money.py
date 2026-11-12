@@ -17,10 +17,10 @@ API = "https://api.usaspending.gov/api/v2"
 CONTRACTS = ["A", "B", "C", "D"]          # contract award types
 IDVS = ["IDV_A", "IDV_B", "IDV_B_A", "IDV_B_B", "IDV_B_C", "IDV_C", "IDV_D", "IDV_E"]  # umbrella contracts
 NOT_COMPETED = ["B", "C", "G"]            # not available for competition, not competed, not competed under simplified acquisition
-WORKERS = 6                               # lookups run six at a time
+WORKERS = 4                               # lookups run four at a time
 
 
-def call(path, body=None, tries=3):
+def call(path, body=None, tries=6):
     url = API + path
     for i in range(tries):
         try:
@@ -31,7 +31,7 @@ def call(path, body=None, tries=3):
         except Exception as e:
             if i == tries - 1:
                 raise RuntimeError(f"USAspending.gov request failed ({path}): {e}")
-            time.sleep(2 * (i + 1))
+            time.sleep(min(2 ** i, 20))   # wait 1, 2, 4, 8, 16 seconds between tries
 
 
 def find_agency(name):
