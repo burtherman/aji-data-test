@@ -66,7 +66,9 @@ def main():
     t0 = time.time()
 
     agency = find_agency(a.agency)
-    today = dt.date.today()
+    # Cloud sessions run on UTC; use Eastern time so an evening run isn't dated tomorrow
+    from zoneinfo import ZoneInfo
+    today = dt.datetime.now(ZoneInfo("America/New_York")).date()
     start = today - dt.timedelta(days=a.days)
     prior_end = start - dt.timedelta(days=1)
     prior_start = prior_end.replace(year=prior_end.year - a.years)
