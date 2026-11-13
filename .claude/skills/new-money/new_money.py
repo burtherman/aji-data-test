@@ -3,7 +3,7 @@
 
 Pulls an agency's new contracts from USAspending.gov, checks whether each company
 had any contract with that agency in the years before, flags contracts that were
-not competed, and writes index.html (the page) and leads.csv (the same rows).
+not competed, and writes leads.md (readable on GitHub, even in a private repository), index.html (a web page) and leads.csv (the same rows for a spreadsheet).
 
 Usage:
   python3 new_money.py "Department of Agriculture" [--days 30] [--floor 100000] [--years 5]
@@ -125,11 +125,12 @@ def main():
     secs = round(time.time() - t0)
 
     write_csv(leads)
+    write_md(agency, a, start, today, prior_start, allnew, big, ueis, leads)
     write_page(agency, a, start, today, prior_start, prior_end, allnew, big, ueis, leads, secs)
     print(f"{agency}: {len(allnew)} new contracts; {len(big)} at ${a.floor:,.0f} or more, to {len(ueis)} companies; "
           f"{len(new_ueis)} companies new to the agency, {len(leads)} contracts; "
           f"{sum(r['not_competed'] for r in leads)} not competed; {sum(r['same_name'] for r in leads)} same-name flags. "
-          f"Took {secs} seconds. Wrote index.html and leads.csv.")
+          f"Took {secs} seconds. Wrote leads.md, leads.csv and index.html.")
 
 
 def award_url(r):
@@ -164,6 +165,42 @@ def write_csv(leads):
             w.writerow([cell(x) for x in [r["Recipient Name"], r["Award Amount"], r["Base Obligation Date"], r["Awarding Sub Agency"],
                         r["Description"], "yes" if r["not_competed"] else "", "yes" if r["same_name"] else "",
                         award_url(r), fec_url(r["Recipient Name"])]])
+
+
+def md(v):
+    # Keep table cells on one line and stop a | from breaking the table
+    return " ".join(str(v or "").split()).replace("|", "/")
+
+
+def write_md(agency, a, start, today, prior_start, allnew, big, ueis, leads):
+    nc = sum(r["not_competed"] for r in leads)
+    out = [f"# New money at {agency}", "",
+           f"Contracts of ${a.floor:,.0f} or more that {agency} awarded from {fmt_date(start.isoformat())} through {fmt_date(today.isoformat())} "
+           f"to companies with no contract from the agency since {fmt_date(prior_start.isoformat())}. Biggest first. **These are leads to check, not findings.**", "",
+           f"{len(allnew)} new contracts in {a.days} days; {len(big)} were ${a.floor:,.0f} or more, to {len(ueis)} companies. "
+           f"{len(set(r['Recipient UEI'] for r in leads))} of those companies look new to the agency; {nc} of their contracts were not competed. "
+           f"Data from USAspending.gov, pulled {fmt_date(today.isoformat())}.", "",
+           "| Company | Amount | Awarded | What it's for | Flags | Check it |", "|---|--:|---|---|---|---|"]
+    for r in leads:
+        flags = []
+        if r["not_competed"]:
+            flags.append("**Not competed**")
+        if r["same_name"]:
+            flags.append("Probably not new: same name had contracts")
+        out.append(f"| {md(r['Recipient Name'])} | ${r['Award Amount']:,.0f} | {fmt_date(r['Base Obligation Date'])} | "
+                   f"{md((r['Description'] or '').capitalize())} | {'; '.join(flags)} | "
+                   f"[Contract record]({award_url(r)}) · [Search donations]({fec_url(r['Recipient Name'])}) |")
+    if not leads:
+        out.append("| No contracts matched. | | | | | |")
+    out += ["", "## What this could get wrong", "",
+            "- One company can have more than one ID, and a parent or subsidiary with a different name won't be caught.",
+            "- Joint ventures get their own ID, so a \"new\" joint venture can be made of longtime contractors.",
+            "- Only contracts count. Grants, loans, farm payments and subcontracts don't.",
+            "- Many small purchases aren't reported, so a company with small past sales may look new.",
+            "- Agencies report late, and amounts change as contracts are modified.",
+            "- \"Search donations\" finds people who named this company as their employer. Expect small, old and wrong-company matches.",
+            ""]
+    open("leads.md", "w").write("\n".join(out))
 
 
 def fmt_date(s):
